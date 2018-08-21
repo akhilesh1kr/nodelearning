@@ -1,0 +1,17 @@
+{
+  "name": "awesome-test",
+  "version": "1.0.0",
+  "description": "First Node App",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Akhilesh Kumar",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.16.3",
+    "mongoose": "^5.2.7",
+    "nodemon": "^1.18.3",
+    "passport": "^0.4.0"
+  }
+}
