@@ -8,6 +8,9 @@ var morgan      = require('morgan'); // used to see requests
 var mongoose    = require('mongoose'); // for working w/ our database
 var User        = require('./app/models/user');
 var port        = process.env.PORT || 8080; // set the port for our app
+var jwt = require('jsonwebtoken');
+
+var superSecret = 'ilovescotchscotchyscotchscotch';
 
 // APP CONFIGURATION ---------------------
 // use body parser so we can grab information from POST requests
@@ -44,15 +47,104 @@ app.get('/', function(req, res) {
 // get an instance of the express router
 var apiRouter = express.Router();
 
+
+// route to authenticate a user (POST http://localhost:8080/api/authenticate)
+apiRouter.post('/authenticate', function(req, res) {
+    // console.log("inside authenticate");
+    // find the user
+    // select the name username and password explicitly
+    User.findOne({
+        username: req.body.username
+    }).select('name username password').exec(function(err, user) {
+        
+        if (err) throw err;
+        
+        // no user with that username was found
+        if (!user) {
+            res.json({
+            success: false,
+            message: 'Authentication failed. User not found.'
+            });
+        } else if (user) {
+            
+            // check if password matches
+            var validPassword = user.comparePassword(req.body.password);
+            if (!validPassword) {
+                res.json({
+                success: false,
+                message: 'Authentication failed. Wrong password.'
+                });
+            } else {
+            
+            // if user is found and password is right
+            // create a token
+                var token = jwt.sign({
+                        name: user.name,
+                        username: user.username
+                    }, superSecret, {
+                        expiresIn: '24h' // expires in 24 hours
+                });
+                // var token = user.name+user.username;
+
+                // return the information including token as JSON
+                res.json({
+                    success: true,
+                    message: 'Enjoy your token!',
+                    token: token
+                });
+            }
+        }
+    });
+});
+
+
+
+
+
+
+
 apiRouter.use(function(req, res, next) {
     // do logging
-    console.log('Somebody just came to our app!');
+    console.log('Somebody just came to our app APP!');
 
-    // we'll add more to the middleware in Chapter 10
-    // this is where we will authenticate users
+    // check header or url parameters or post parameters for token
+    var token = req.body.token || req.query.token || req.headers['x-access-token'];
+    console.log(token);
+    // decode token
+    if (token) {
+        // verifies secret and checks exp
+        jwt.verify(token, superSecret, function(err, decoded) {
+            if (err) {
+                return res.json({
+                    success: false,
+                    message: 'Failed to authenticate token.'
+                });
+            } else {
+                    // if everything is good, save to request for use in other routes
+                    req.decoded = decoded;
+                    console.log(req.decoded);
+                    next();
+                }
+        });
+    } else {
+        // if there is no token
+        // return an HTTP response of 403 (access forbidden) and an error message
+        return res.status(403).send({
+            success: false,
+            message: 'No token provided.'
+        });
+    }
+
+
+
     next(); // make sure we go to the next routes and don't stop here
 });
 
+// api endpoint to get user information
+apiRouter.get('/me', function(req, res) {
+    console.log("inside me function");
+    res.send(req.decoded);
+});
 
 // test route to make sure everything is working
 // accessed at GET http://localhost:8080/api
@@ -66,7 +158,8 @@ apiRouter.route('/users')
 
     // create a user (accessed at POST http://localhost:8080/users)
     .post(function(req, res) {
-        
+        console.log(req);
+        // console.log(res);
         // create a new instance of the User model
         var user = new User();
 
@@ -93,6 +186,7 @@ apiRouter.route('/users')
 
     // get all the users (accessed at GET http://localhost:8080/api/users)
     .get(function(req, res) {
+        console.log("Inside users->get")
         User.find(function(err, users) {
             if (err) return res.send(err);
 
